@@ -91,7 +91,7 @@ class GDriveReader:
                     service.files()
                     .list(
                         q=query_str,
-                        pageSize=100,
+                        pageSize=500,
                         fields="*",
                         pageToken=page_token,
                     )
@@ -116,9 +116,9 @@ class GDriveReader:
 class GDriveFileDownloader:
     def __init__(self, credentials: Credentials):
         self.credentials = credentials
-        self.service = self.get_service()
 
-    def get_service(self):
+    @property
+    def service(self):
         return build("drive", "v3", credentials=self.credentials)
 
     def download(self, file_id, download_path, file_name):

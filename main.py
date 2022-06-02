@@ -3,7 +3,12 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from src.gdrive import Credentials, GDriveCredential, GDriveFileDownloader, GDriveReader
+from src.gdrive import (
+    Credentials,
+    GDriveCredential,
+    GDriveFileDownloader,
+    GDriveReader,
+)
 
 DATA_PATH = Path("/home/data/tomocube")
 PROJECT_LIST = {
@@ -20,6 +25,12 @@ def check_file_exist(target_path, image):
     return Path(target_path, image["name"]).exists()
 
 
+def filter_out_existing_files(image_list):
+    return [
+        image for image in image_list if not check_file_exist(DATA_PATH, image)
+    ]
+
+
 def download_file(credentials, file_id, target_path, image_name):
     downloader = GDriveFileDownloader(credentials)
     downloader.download(file_id, target_path, image_name)
@@ -27,14 +38,15 @@ def download_file(credentials, file_id, target_path, image_name):
 
 def download_files(credentials: Credentials, target_path: Path, folder_id: str):
     image_raw_list = GDriveReader(credentials, folder_id).read()
-    image_filter_list = [
-        image
-        for image in image_raw_list
-        if not check_file_exist(target_path, image)
-    ]
-    # for image in tqdm(image_filter_list):
-    #     downloader.download(image["id"], target_path, image["name"])
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+    image_filter_list = filter_out_existing_files(image_raw_list)
+    _download_files(image_filter_list, credentials, target_path)
+
+
+def _download_files(image_filter_list, credentials, target_path):
+    if len(image_filter_list) == 0:
+        return
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
         futures = [
             executor.submit(
                 download_file,
@@ -55,7 +67,7 @@ def main():
         credentials, PROJECT_LIST["2022_tomocube_sepsis"]
     ).read()
 
-    for patient in tqdm(patient_list):
+    for patient in tqdm(reversed(patient_list)):
         print(patient)
         target_path = create_dir(patient["name"])
         download_files(credentials, target_path, patient["id"])
